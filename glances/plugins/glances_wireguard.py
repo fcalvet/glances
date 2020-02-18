@@ -153,13 +153,6 @@ class Plugin(GlancesPlugin):
 
         return self.stats
 
-    def get_stats_action(self):
-        """Return stats for the action.
-
-        Docker will return self.stats['containers']
-        """
-        return self.stats['containers']
-
     def update_views(self):
         """Update stats views."""
         # Call the father's method
@@ -168,129 +161,67 @@ class Plugin(GlancesPlugin):
         if 'peers' not in self.stats:
             return False
           
-        for peers in self.stats[peers]
+        for peer in self.stats[peers]:
             # Convert rate in bps ( to be able to compare to interface speed)
-            bps_rx = int(i['rx'] // i['time_since_update'] * 8)
-            bps_tx = int(i['tx'] // i['time_since_update'] * 8)
+            bps_rx = int(peer['rx'] * 8)
+            bps_tx = int(peer['tx'] * 8)
             # Decorate the bitrate with the configuration file thresolds
-            alert_rx = self.get_alert(bps_rx, header=ifrealname + '_rx')
-            alert_tx = self.get_alert(bps_tx, header=ifrealname + '_tx')
+            alert_rx = self.get_alert(bps_rx, header= peer["pubkey"] + '_rx')
+            alert_tx = self.get_alert(bps_tx, header= peer["pubkey"] + '_tx')
         # Add specifics informations
         # Alert
         for i in self.stats['peers']:
-            # Init the views for the current container (key = container name)
-            self.views[i[self.get_key()]] = {'cpu': {}, 'mem': {}}
-            # Handshake alert
-            if 'cpu' in i and 'total' in i['cpu']:
-                # Looking for specific CPU container threasold in the conf file
-                alert = self.get_alert(i['cpu']['total'],
-                                       header=i['name'] + '_cpu',
-                                       action_key=i['name'])
-                if alert == 'DEFAULT':
-                    # Not found ? Get back to default CPU threasold value
-                    alert = self.get_alert(i['cpu']['total'], header='cpu')
-                self.views[i[self.get_key()]]['cpu']['decoration'] = alert
-            # Transfer alert
-            if 'memory' in i and 'usage' in i['memory']:
-                # Looking for specific MEM container threasold in the conf file
-                alert = self.get_alert(i['memory']['usage'],
-                                       maximum=i['memory']['limit'],
-                                       header=i['name'] + '_mem',
-                                       action_key=i['name'])
-                if alert == 'DEFAULT':
-                    # Not found ? Get back to default MEM threasold value
-                    alert = self.get_alert(i['memory']['usage'],
-                                           maximum=i['memory']['limit'],
-                                           header='mem')
-                self.views[i[self.get_key()]]['mem']['decoration'] = alert
+            
 
         return True
 
-    def msg_curse(self, args=None, max_width=None):
+        def msg_curse(self, args=None, max_width=None):
         """Return the dict to display in the curse interface."""
         # Init the return message
         ret = []
 
-        # Only process if stats exist (and non null) and display plugin enable...
-        if not self.stats \
-           or 'containers' not in self.stats or len(self.stats['containers']) == 0 \
-           or self.is_disable():
+        # Only process if stats exist and display plugin enable...
+        if not self.stats or self.is_disable():
             return ret
 
-        # Build the string message
-        # Title
-        msg = '{}'.format('CONTAINERS')
-        ret.append(self.curse_add_line(msg, "TITLE"))
-        msg = ' {}'.format(len(self.stats['containers']))
-        ret.append(self.curse_add_line(msg))
-        msg = ' (served by Docker {})'.format(self.stats['version']["Version"])
-        ret.append(self.curse_add_line(msg))
-        ret.append(self.curse_new_line())
+        # Max size for the interface name
+        name_max_width = max_width - 12
+
         # Header
-        ret.append(self.curse_new_line())
-        # Get the maximum containers name (cutted to 20 char max)
-        name_max_width = min(20, len(max(self.stats['containers'], key=lambda x: len(x['name']))['name']))
-        msg = ' {:{width}}'.format('Name', width=name_max_width)
-        ret.append(self.curse_add_line(msg))
-        msg = '{:>10}'.format('Status')
-        ret.append(self.curse_add_line(msg))
-        msg = '{:>6}'.format('CPU%')
-        ret.append(self.curse_add_line(msg))
-        msg = '{:>7}'.format('MEM')
-        ret.append(self.curse_add_line(msg))
-        msg = '{:>7}'.format('/MAX')
-        ret.append(self.curse_add_line(msg))
-        msg = '{:>7}'.format('IOR/s')
-        ret.append(self.curse_add_line(msg))
-        msg = '{:>7}'.format('IOW/s')
-        ret.append(self.curse_add_line(msg))
-        msg = '{:>7}'.format('Rx/s')
-        ret.append(self.curse_add_line(msg))
-        msg = '{:>7}'.format('Tx/s')
-        ret.append(self.curse_add_line(msg))
-        msg = ' {:8}'.format('Command')
-        ret.append(self.curse_add_line(msg))
-        # Data
-        for container in self.stats['containers']:
-            ret.append(self.curse_new_line())
-            # Name
-            ret.append(self.curse_add_line(self._msg_name(container=container,
-                                                          max_width=name_max_width)))
-            # Status
-            status = self.container_alert(container['Status'])
-            msg = '{:>10}'.format(container['Status'][0:10])
-            ret.append(self.curse_add_line(msg, status))
-            # CPU
-            try:
-                msg = '{:>6.1f}'.format(container['cpu']['total'])
-            except KeyError:
-                msg = '{:>6}'.format('_')
-            ret.append(self.curse_add_line(msg, self.get_views(item=container['name'],
-                                                               key='cpu',
-                                                               option='decoration')))
-            # MEM
-            try:
-                msg = '{:>7}'.format(self.auto_unit(container['memory']['usage']))
-            except KeyError:
-                msg = '{:>7}'.format('_')
-            ret.append(self.curse_add_line(msg, self.get_views(item=container['name'],
-                                                               key='mem',
-                                                               option='decoration')))
-            try:
-                msg = '{:>7}'.format(self.auto_unit(container['memory']['limit']))
-            except KeyError:
-                msg = '{:>7}'.format('_')
-            ret.append(self.curse_add_line(msg))
-            # IO R/W
-            unit = 'B'
-            for r in ['ior', 'iow']:
-                try:
-                    value = self.auto_unit(int(container['io'][r] // container['io']['time_since_update'])) + unit
-                    msg = '{:>7}'.format(value)
-                except KeyError:
-                    msg = '{:>7}'.format('_')
+        msg = '{:{width}}'.format('WG: {}'.format(self.interface), width=name_max_width)
+        ret.append(self.curse_add_line(msg, "TITLE"))
+        if args.network_cumul:
+            # Cumulative stats
+            if args.network_sum:
+                # Sum stats
+                msg = '{:>14}'.format('Rx+Tx')
                 ret.append(self.curse_add_line(msg))
-            # NET RX/TX
+            else:
+                # Rx/Tx stats
+                msg = '{:>7}'.format('Rx')
+                ret.append(self.curse_add_line(msg))
+                msg = '{:>7}'.format('Tx')
+                ret.append(self.curse_add_line(msg))
+        else:
+            # Bitrate stats
+            if args.network_sum:
+                # Sum stats
+                msg = '{:>14}'.format('Rx+Tx/s')
+                ret.append(self.curse_add_line(msg))
+            else:
+                msg = '{:>7}'.format('Rx/s')
+                ret.append(self.curse_add_line(msg))
+                msg = '{:>7}'.format('Tx/s')
+                ret.append(self.curse_add_line(msg))
+        # Interface list (sorted by name)
+        for i in self.stats["peers"]:
+            # Format stats
+            # Is there an alias for the interface name ?
+            ifrealname = i['interface_name'].split(':')[0]
+            if len(ifname) > name_max_width:
+                # Cut interface name if it is too long
+                ifname = '_' + ifname[-name_max_width + 1:]
+
             if args.byte:
                 # Bytes per second (for dummy)
                 to_bit = 1
@@ -299,23 +230,36 @@ class Plugin(GlancesPlugin):
                 # Bits per second (for real network administrator | Default)
                 to_bit = 8
                 unit = 'b'
-            for r in ['rx', 'tx']:
-                try:
-                    value = self.auto_unit(int(container['network'][r] // container['network']['time_since_update'] * to_bit)) + unit
-                    msg = '{:>7}'.format(value)
-                except KeyError:
-                    msg = '{:>7}'.format('_')
-                ret.append(self.curse_add_line(msg))
-            # Command
-            if container['Command'] is not None:
-                msg = ' {}'.format(' '.join(container['Command']))
+
+            if args.network_cumul:
+                rx = self.auto_unit(int(i['transfer-rx'] * to_bit)) + unit
+                tx = self.auto_unit(int(i['transfer-tx'] * to_bit)) + unit
+                sx = self.auto_unit(int(i['transfer-rx'] * to_bit) +
+                                    int(i['transfer-tx'] * to_bit)) + unit
             else:
-                msg = ' {}'.format('_')
-            ret.append(self.curse_add_line(msg, splittable=True))
+                rx = self.auto_unit(int(i['rx'] * to_bit)) + unit
+                tx = self.auto_unit(int(i['tx'] * to_bit)) + unit
+                sx = self.auto_unit(int(i['rx'] * to_bit) +
+                                    int(i['tx'] * to_bit)) + unit
+
+            # New line
+            ret.append(self.curse_new_line())
+            msg = '{:{width}}'.format(ifname, width=name_max_width)
+            ret.append(self.curse_add_line(msg))
+            if args.network_sum:
+                msg = '{:>14}'.format(sx)
+                ret.append(self.curse_add_line(msg))
+            else:
+                msg = '{:>7}'.format(rx)
+                ret.append(self.curse_add_line(
+                    msg, self.get_views(item=i[self.get_key()], key='rx', option='decoration')))
+                msg = '{:>7}'.format(tx)
+                ret.append(self.curse_add_line(
+                    msg, self.get_views(item=i[self.get_key()], key='tx', option='decoration')))
 
         return ret
 
-    def _msg_name(self, container, max_width):
+    def _msg_name(self, peer, max_width):
         """Build the peer name."""
         name = peer['pubkey']
         if len(name) > max_width:
