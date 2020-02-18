@@ -78,9 +78,6 @@ class Plugin(GlancesPlugin):
                                      config=config,
                                      items_history_list=items_history_list)
 
-        # The plgin can be disable using: args.disable_docker
-        self.args = args
-
         # We want to display the stat in the curse interface
         self.display_curse = True
 
