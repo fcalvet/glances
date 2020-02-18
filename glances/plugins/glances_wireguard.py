@@ -75,20 +75,6 @@ class Plugin(GlancesPlugin):
         # We want the the interface parameter
         self.interface = self.get_conf_value('interface')
         
-        
-
-    def get_export(self):
-        """Overwrite the default export method.
-
-        - Only exports containers
-        - The key is the first container name
-        """
-        ret = []
-        try:
-            ret = self.stats['containers']
-        except KeyError as e:
-            logger.debug("docker plugin - Docker export error {}".format(e))
-        return ret
 
     @GlancesPlugin._check_decorator
     @GlancesPlugin._log_result_decorator
