@@ -31,24 +31,6 @@ from glances.processes import sort_stats as sort_stats_processes, weighted, glan
 # Define the items history list (list of items to add to history)
 # TODO: For the moment limited to the CPU. Had to change the graph exports
 #       method to display one graph per container.
-# items_history_list = [{'name': 'cpu_percent',
-#                        'description': 'Container CPU consumption in %',
-#                        'y_unit': '%'},
-#                       {'name': 'memory_usage',
-#                        'description': 'Container memory usage in bytes',
-#                        'y_unit': 'B'},
-#                       {'name': 'network_rx',
-#                        'description': 'Container network RX bitrate in bits per second',
-#                        'y_unit': 'bps'},
-#                       {'name': 'network_tx',
-#                        'description': 'Container network TX bitrate in bits per second',
-#                        'y_unit': 'bps'},
-#                       {'name': 'io_r',
-#                        'description': 'Container IO bytes read per second',
-#                        'y_unit': 'Bps'},
-#                       {'name': 'io_w',
-#                        'description': 'Container IO bytes write per second',
-#                        'y_unit': 'Bps'}]
 items_history_list = [{'name': 'cpu_percent',
                        'description': 'Container CPU consumption in %',
                        'y_unit': '%'}]
