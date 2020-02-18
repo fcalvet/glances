@@ -118,26 +118,26 @@ class Plugin(GlancesPlugin):
             interface_line = wg_dump.readline().split('\t')
             stats["interface"] = {"name": self.interface,
                                   "pubkey": interface_line[0],
-                                  "listening_port": interface_line[2]
+                                  "listening_port": interface_line[2],
                                   'time_since_update': time_since_update
                                  }                                  
               
             # Get stats for all peers
             stats['peers'] = []
             for lines in wg_dump.readlines():
-              lines.split('\t')
-              peer={"pubkey": peer[0],
-                    "preshared-key": peer[1],
-                    "endpoint": peer[2],
-                    "allowed-ips": peer[3],
-                    "latest_handshake": peer[4],
-                    "transfer-rx": peer[5],
-                    "transfer-tx": peer[6],
-                    "persistent-keepalive": peer[7]
+              peer_line = lines.split('\t')
+              peer={"pubkey": peer_line[0],
+                    "preshared-key": peer_line[1],
+                    "endpoint": peer_line[2],
+                    "allowed-ips": peer_line[3],
+                    "latest_handshake": peer_line[4],
+                    "transfer-rx": peer_line[5],
+                    "transfer-tx": peer_line[6],
+                    "persistent-keepalive": peer_line[7]
               }
               try:
-                peer['rx'] = peer["transfer-rx"] - self.peers_old[peer['pubkey']]["transfer-rx"]
-                peer['tx'] = peer["transfer-tx"] - self.peers_old[peer['pubkey']]["transfer-tx"]
+                peer['rx'] = (peer["transfer-rx"] - self.peers_old[peer['pubkey']]["transfer-rx"])//time_since_update
+                peer['tx'] = (peer["transfer-tx"] - self.peers_old[peer['pubkey']]["transfer-tx"])//time_since_update
               except KeyError:
                   continue
               stats['peers'][peer["pubkey"]]=peer
@@ -167,7 +167,14 @@ class Plugin(GlancesPlugin):
 
         if 'peers' not in self.stats:
             return False
-
+          
+        for peers in self.stats[peers]
+            # Convert rate in bps ( to be able to compare to interface speed)
+            bps_rx = int(i['rx'] // i['time_since_update'] * 8)
+            bps_tx = int(i['tx'] // i['time_since_update'] * 8)
+            # Decorate the bitrate with the configuration file thresolds
+            alert_rx = self.get_alert(bps_rx, header=ifrealname + '_rx')
+            alert_tx = self.get_alert(bps_tx, header=ifrealname + '_tx')
         # Add specifics informations
         # Alert
         for i in self.stats['peers']:
