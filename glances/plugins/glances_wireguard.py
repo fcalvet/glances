@@ -105,16 +105,9 @@ class Plugin(GlancesPlugin):
         if self.input_method == 'local':
             # Update stats
 
-            # Docker version
-            # Exemple: {
-            #     "KernelVersion": "3.16.4-tinycore64",
-            #     "Arch": "amd64",
-            #     "ApiVersion": "1.15",
-            #     "Version": "1.3.0",
-            #     "GitCommit": "c78088f",
-            #     "Os": "linux",
-            #     "GoVersion": "go1.3.3"
-            # }
+            # Sample output of wg shows INTERFACE dump
+            # PUBKEYSERVER\tPRIVKEY\tLISTENINGPORT\toff\tfwmark\n
+            # PUBKEYPEER1\t(none)\tENDPOINT\tALLOWEP_IPS\tlatest-handshake\ttransfer-rx\ttransfer-tx\tpersistent-keepalive\n
             try:
                 wg_dump = os.popen("wg show {} dump".format(self.interface))
             except Exception as e:
@@ -122,34 +115,38 @@ class Plugin(GlancesPlugin):
                 self.stats = []
                 return self.stats
             
-            interface = wg_dump.readline().split('\t')
+            interface_line = wg_dump.readline().split('\t')
+            stats["interface"] = {"name": self.interface,
+                                  "pubkey": interface_line[0],
+                                  "listening_port": interface_line[2]
+                                  'time_since_update': time_since_update
+                                 }                                  
+              
             # Get stats for all peers
             stats['peers'] = []
             for lines in wg_dump.readlines():
               lines.split('\t')
-              peer={}
-              peer["pubkey"] = peer[0]
-              peer["preshared-key"] = peer[1]
-              peer["endpoint"] = peer[2]
-              peer["allowed-ips"] = peer[3]
-              peer["latest_handshake"] = peer[4]
-              peer["transfer-rx"] = peer[5]
-              peer["transfer-tx"] = peer[6]
-              peer["persistent-keepalive"] = peer[7]
+              peer={"pubkey": peer[0],
+                    "preshared-key": peer[1],
+                    "endpoint": peer[2],
+                    "allowed-ips": peer[3],
+                    "latest_handshake": peer[4],
+                    "transfer-rx": peer[5],
+                    "transfer-tx": peer[6],
+                    "persistent-keepalive": peer[7]
+              }
               try:
-                peers_old['rx'] = peers["eth0"]["rx_bytes"] - self.peers_old[]["eth0"]["rx_bytes"]
-                network_new['tx'] = peers["eth0"]["tx_bytes"] - self.peers_old[container_id]["eth0"]["tx_bytes"]
-                network_new['cumulative_rx'] = peers["eth0"]["rx_bytes"]
-                network_new['cumulative_tx'] = peers["eth0"]["tx_bytes"]
+                peer['rx'] = peer["transfer-rx"] - self.peers_old[peer['pubkey']]["transfer-rx"]
+                peer['tx'] = peer["transfer-tx"] - self.peers_old[peer['pubkey']]["transfer-tx"]
               except KeyError:
                   continue
-                stats['peers'].append(peer_stats)
+              stats['peers'][peer["pubkey"]]=peer
         elif self.input_method == 'snmp':
             # Update stats using SNMP
             # Not available
             pass
 
-        self.peers_old = peer_new  
+        self.peers_old = stats['peers']
         
         # Update the stats
         self.stats = stats
