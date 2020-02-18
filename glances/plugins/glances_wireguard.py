@@ -23,7 +23,7 @@ import os
 import time
 
 from glances.logger import logger
-from glances.compat import iterkeys, itervalues, nativestr
+from glances.compat import iterkeys, itervalues, nativestr, is_admin
 from glances.timer import getTimeSinceLastUpdate
 from glances.plugins.glances_plugin import GlancesPlugin
 from glances.processes import sort_stats as sort_stats_processes, weighted, glances_processes
@@ -44,12 +44,13 @@ class Plugin(GlancesPlugin):
 
     def __init__(self, args=None, config=None):
         """Init the plugin."""
+        # check if user is admin
+        if not is_admin():
+            disable(args, "wireguard")
+            logger.debug("Current user is not admin, WireGuard plugin disabled.")
         super(Plugin, self).__init__(args=args,
                                      config=config,
                                      items_history_list=items_history_list)
-
-        # The plugin can be disable using: args.disable_docker
-        self.args = args
 
         # We want to display the stat in the curse interface
         self.display_curse = True
