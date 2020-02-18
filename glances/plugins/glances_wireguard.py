@@ -121,30 +121,38 @@ class Plugin(GlancesPlugin):
                 logger.error("{} plugin - Cannot open wireguard interface {} ({})".format(self.plugin_name, self.interface, e))
                 self.stats = []
                 return self.stats
-                
-            wg_dump.readline
+            
+            interface = wg_dump.readline().split('\t')
             # Get stats for all peers
             stats['peers'] = []
-            for peers in containers:
-                try:
-                  network_new['rx'] = netcounters["eth0"]["rx_bytes"] - self.netcounters_old[container_id]["eth0"]["rx_bytes"]
-                  network_new['tx'] = netcounters["eth0"]["tx_bytes"] - self.netcounters_old[container_id]["eth0"]["tx_bytes"]
-                  network_new['cumulative_rx'] = netcounters["eth0"]["rx_bytes"]
-                  network_new['cumulative_tx'] = netcounters["eth0"]["tx_bytes"]
-                except KeyError as e:
-                  # all_stats do not have INTERFACE information
-                  logger.debug("docker plugin - Cannot grab network interface usage for container {} ({})".format(container_id, e))
-                  logger.debug(all_stats)
-                  # Add current container stats to the stats list
+            for lines in wg_dump.readlines():
+              lines.split('\t')
+              peer={}
+              peer["pubkey"] = peer[0]
+              peer["preshared-key"] = peer[1]
+              peer["endpoint"] = peer[2]
+              peer["allowed-ips"] = peer[3]
+              peer["latest_handshake"] = peer[4]
+              peer["transfer-rx"] = peer[5]
+              peer["transfer-tx"] = peer[6]
+              peer["persistent-keepalive"] = peer[7]
+              try:
+                peers_old['rx'] = peers["eth0"]["rx_bytes"] - self.peers_old[]["eth0"]["rx_bytes"]
+                network_new['tx'] = peers["eth0"]["tx_bytes"] - self.peers_old[container_id]["eth0"]["tx_bytes"]
+                network_new['cumulative_rx'] = peers["eth0"]["rx_bytes"]
+                network_new['cumulative_tx'] = peers["eth0"]["tx_bytes"]
+              except KeyError:
+                  continue
                 stats['peers'].append(peer_stats)
-
         elif self.input_method == 'snmp':
             # Update stats using SNMP
             # Not available
             pass
 
-        # Sort and update the stats
-        self.stats = sort_stats(stats)
+        self.peers_old = peer_new  
+        
+        # Update the stats
+        self.stats = stats
 
         return self.stats
 
