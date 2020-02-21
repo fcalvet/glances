@@ -56,7 +56,7 @@ class Plugin(GlancesPlugin):
         self.display_curse = True
         
         # We want the the interface parameter
-        self.interface = self.get_conf_value('interface')
+        self.interfaces = self.get_conf_value('interfaces')
         
 
     @GlancesPlugin._check_decorator
@@ -73,49 +73,49 @@ class Plugin(GlancesPlugin):
 
         if self.input_method == 'local':
             # Update stats
-
-            # Sample output of wg shows INTERFACE dump
-            # PUBKEYSERVER\tPRIVKEY\tLISTENINGPORT\toff\tfwmark\n
-            # PUBKEYPEER1\t(none)\tENDPOINT\tALLOWEP_IPS\tlatest-handshake\ttransfer-rx\ttransfer-tx\tpersistent-keepalive\n
-            try:
-                wg_dump = os.popen("wg show {} dump".format(self.interface))
-            except Exception as e:
-                logger.error("{} plugin - Cannot open wireguard interface {} ({})".format(self.plugin_name, self.interface, e))
-                self.stats = []
-                return self.stats
-            
-            interface_line = wg_dump.readline().split('\t')
-            stats["interface"] = {"name": self.interface,
-                                  "pubkey": interface_line[0],
-                                  "listening_port": interface_line[2],
-                                  'time_since_update': time_since_update
-                                 }                                  
-              
-            # Get stats for all peers
-            stats['peers'] = []
-            for lines in wg_dump.readlines():
-              peer_line = lines.split('\t')
-              peer={"pubkey": peer_line[0],
-                    "preshared-key": peer_line[1],
-                    "endpoint": peer_line[2],
-                    "allowed-ips": peer_line[3],
-                    "latest_handshake": peer_line[4],
-                    "transfer-rx": peer_line[5],
-                    "transfer-tx": peer_line[6],
-                    "persistent-keepalive": peer_line[7]
-              }
+          for interface in self.interfaces:
+              # Sample output of wg shows INTERFACE dump
+              # PUBKEYSERVER\tPRIVKEY\tLISTENINGPORT\toff\tfwmark\n
+              # PUBKEYPEER1\t(none)\tENDPOINT\tALLOWEP_IPS\tlatest-handshake\ttransfer-rx\ttransfer-tx\tpersistent-keepalive\n
               try:
-                peer['rx'] = (peer["transfer-rx"] - self.peers_old[peer['pubkey']]["transfer-rx"])//time_since_update
-                peer['tx'] = (peer["transfer-tx"] - self.peers_old[peer['pubkey']]["transfer-tx"])//time_since_update
-              except KeyError:
-                  continue
-              stats['peers'][peer["pubkey"]]=peer
+                  wg_dump = os.popen("wg show {} dump".format(interface))
+              except Exception as e:
+                  logger.error("{} plugin - Cannot open wireguard interface {} ({})".format(self.plugin_name, interface, e))
+                  self.stats = []
+                  return self.stats
+
+              interface_line = wg_dump.readline().split('\t')
+              interface_dict = {"name": interface,
+                                "pubkey": interface_line[0],
+                                "listening_port": interface_line[2],
+                                'time_since_update': time_since_update
+                                "peer": []
+                                }                                  
+
+              # Get stats for all peers
+              for lines in wg_dump.readlines():
+                peer_line = lines.split('\t')
+                peer={"pubkey": peer_line[0],
+                      "preshared-key": peer_line[1],
+                      "endpoint": peer_line[2],
+                      "allowed-ips": peer_line[3],
+                      "latest_handshake": peer_line[4],
+                      "transfer-rx": peer_line[5],
+                      "transfer-tx": peer_line[6],
+                      "persistent-keepalive": peer_line[7]
+                }
+                try:
+                  peer['rx'] = (peer["transfer-rx"] - self.peers_old[peer['pubkey']]["transfer-rx"])//time_since_update
+                  peer['tx'] = (peer["transfer-tx"] - self.peers_old[peer['pubkey']]["transfer-tx"])//time_since_update
+                except KeyError:
+                    continue
+                interface_dict[peer["pubkey"]] = peer
         elif self.input_method == 'snmp':
             # Update stats using SNMP
             # Not available
             pass
 
-        self.peers_old = stats['peers']
+        self.stats_old = stats
         
         # Update the stats
         self.stats = stats
@@ -129,15 +129,16 @@ class Plugin(GlancesPlugin):
 
         if 'peers' not in self.stats:
             return False
-          
-        for peer in self.stats[peers]:
-            # Convert rate in bps ( to be able to compare to interface speed)
-            bps_rx = int(peer['rx'] * 8)
-            bps_tx = int(peer['tx'] * 8)
-            # Decorate the bitrate with the configuration file thresolds
-            alert_rx = self.get_alert(bps_rx, header= peer["pubkey"] + '_rx')
-            alert_tx = self.get_alert(bps_tx, header= peer["pubkey"] + '_tx')
+        for interface in self.stats:
+          for peer in interface[peers]:
+              # Convert rate in bps ( to be able to compare to interface speed)
+              bps_rx = int(peer['rx'] * 8)
+              bps_tx = int(peer['tx'] * 8)
+              # Decorate the bitrate with the configuration file thresolds
+              alert_rx = self.get_alert(bps_rx, header= peer["pubkey"] + '_rx')
+              alert_tx = self.get_alert(bps_tx, header= peer["pubkey"] + '_tx')
         # Add specifics informations
+        
         # Alert
         for i in self.stats['peers']:
             
