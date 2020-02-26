@@ -86,30 +86,30 @@ class Plugin(GlancesPlugin):
 
               interface_line = wg_dump.readline().split('\t')
               interface_dict = {"name": interface,
-                                "pubkey": interface_line[0],
+                                # "pubkey": interface_line[0],
                                 "listening_port": interface_line[2],
                                 'time_since_update': time_since_update
-                                "peer": []
+                                "peers": []
                                 }                                  
 
               # Get stats for all peers
               for lines in wg_dump.readlines():
                 peer_line = lines.split('\t')
                 peer={"pubkey": peer_line[0],
-                      "preshared-key": peer_line[1],
+                      # "preshared-key": peer_line[1],
                       "endpoint": peer_line[2],
                       "allowed-ips": peer_line[3],
                       "latest_handshake": peer_line[4],
                       "transfer-rx": peer_line[5],
-                      "transfer-tx": peer_line[6],
-                      "persistent-keepalive": peer_line[7]
+                      "transfer-tx": peer_line[6]
+                      # "persistent-keepalive": peer_line[7]
                 }
                 try:
                   peer['rx'] = (peer["transfer-rx"] - self.peers_old[peer['pubkey']]["transfer-rx"])//time_since_update
                   peer['tx'] = (peer["transfer-tx"] - self.peers_old[peer['pubkey']]["transfer-tx"])//time_since_update
                 except KeyError:
                     continue
-                interface_dict[peer["pubkey"]] = peer
+                interface_dict[peers["pubkey"]] = peer
         elif self.input_method == 'snmp':
             # Update stats using SNMP
             # Not available
@@ -127,8 +127,6 @@ class Plugin(GlancesPlugin):
         # Call the father's method
         super(Plugin, self).update_views()
 
-        if 'peers' not in self.stats:
-            return False
         for interface in self.stats:
           for peer in interface[peers]:
               # Convert rate in bps ( to be able to compare to interface speed)
@@ -137,57 +135,58 @@ class Plugin(GlancesPlugin):
               # Decorate the bitrate with the configuration file thresolds
               alert_rx = self.get_alert(bps_rx, header= peer["pubkey"] + '_rx')
               alert_tx = self.get_alert(bps_tx, header= peer["pubkey"] + '_tx')
-        # Add specifics informations
-        
-        # Alert
-        for i in self.stats['peers']:
+              
+              
+          # Alert
+          for i in self.stats['peers']:
             
 
         return True
 
-        def msg_curse(self, args=None, max_width=None):
-        """Return the dict to display in the curse interface."""
-        # Init the return message
-        ret = []
+      def msg_curse(self, args=None, max_width=None):
+      """Return the dict to display in the curse interface."""
+      # Init the return message
+      ret = []
 
-        # Only process if stats exist and display plugin enable...
-        if not self.stats or self.is_disable():
-            return ret
+      # Only process if stats exist and display plugin enable...
+      if not self.stats or self.is_disable():
+          return ret
 
-        # Max size for the interface name
-        name_max_width = max_width - 12
+      # Max size for the interface name
+      name_max_width = max_width - 12
 
-        # Header
-        msg = '{:{width}}'.format('WG: {}'.format(self.interface), width=name_max_width)
-        ret.append(self.curse_add_line(msg, "TITLE"))
-        if args.network_cumul:
-            # Cumulative stats
-            if args.network_sum:
-                # Sum stats
-                msg = '{:>14}'.format('Rx+Tx')
-                ret.append(self.curse_add_line(msg))
-            else:
-                # Rx/Tx stats
-                msg = '{:>7}'.format('Rx')
-                ret.append(self.curse_add_line(msg))
-                msg = '{:>7}'.format('Tx')
-                ret.append(self.curse_add_line(msg))
-        else:
-            # Bitrate stats
-            if args.network_sum:
-                # Sum stats
-                msg = '{:>14}'.format('Rx+Tx/s')
-                ret.append(self.curse_add_line(msg))
-            else:
-                msg = '{:>7}'.format('Rx/s')
-                ret.append(self.curse_add_line(msg))
-                msg = '{:>7}'.format('Tx/s')
-                ret.append(self.curse_add_line(msg))
-        # Interface list (sorted by name)
+      # Header
+      msg = '{:{width}}'.format('WG: {}'.format(self.interface), width=name_max_width)
+      ret.append(self.curse_add_line(msg, "TITLE"))
+      if args.network_cumul:
+          # Cumulative stats
+          if args.network_sum:
+              # Sum stats
+              msg = '{:>14}'.format('Rx+Tx')
+              ret.append(self.curse_add_line(msg))
+          else:
+              # Rx/Tx stats
+              msg = '{:>7}'.format('Rx')
+              ret.append(self.curse_add_line(msg))
+              msg = '{:>7}'.format('Tx')
+              ret.append(self.curse_add_line(msg))
+      else:
+          # Bitrate stats
+          if args.network_sum:
+              # Sum stats
+              msg = '{:>14}'.format('Rx+Tx/s')
+              ret.append(self.curse_add_line(msg))
+          else:
+              msg = '{:>7}'.format('Rx/s')
+              ret.append(self.curse_add_line(msg))
+              msg = '{:>7}'.format('Tx/s')
+              ret.append(self.curse_add_line(msg))
+      # Interface list (sorted by name)
+      for interface in self.stats:
+        # Is there an alias for the interface name ?
+        ifrealname = i['interface_name'].split(':')[0]
         for i in self.stats["peers"]:
             # Format stats
-            # Is there an alias for the interface name ?
-            ifrealname = i['interface_name'].split(':')[0]
             if len(ifname) > name_max_width:
                 # Cut interface name if it is too long
                 ifname = '_' + ifname[-name_max_width + 1:]
@@ -227,7 +226,7 @@ class Plugin(GlancesPlugin):
                 ret.append(self.curse_add_line(
                     msg, self.get_views(item=i[self.get_key()], key='tx', option='decoration')))
 
-        return ret
+      return ret
 
     def _msg_name(self, peer, max_width):
         """Build the peer name."""
@@ -237,14 +236,3 @@ class Plugin(GlancesPlugin):
         else:
             name = name[:max_width]
         return ' {:{width}}'.format(name, width=max_width)
-
-    def container_alert(self, status):
-        """Analyse the container status."""
-        if status in ('running'):
-            return 'OK'
-        elif status in ('exited'):
-            return 'WARNING'
-        elif status in ('dead'):
-            return 'CRITICAL'
-        else:
-            return 'CAREFUL'
